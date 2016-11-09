@@ -9,12 +9,16 @@ public class Movies
         movies = new Dictionary<uint, MovieInfo>();
     }
 
-    public MovieInfo GetMovie(uint movieID)
+    public bool MovieExists(uint movieID)
     {
         if(movies.ContainsKey(movieID))
-            return movies[movieID];
-        else
-            throw new KeyNotFoundException();
+            return true;
+        return false;
+    }
+
+    public MovieInfo GetMovie(uint movieID)
+    {
+        return movies[movieID];
     }
 
     public void AddMovie(uint movieID, MovieInfo movieInfo)

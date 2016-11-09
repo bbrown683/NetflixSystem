@@ -2,11 +2,18 @@ using System.Collections.Generic;
 
 public class UserInfo
 {   
-    private Dictionary<uint, float?> ratings;
+    private Dictionary<uint, float> ratings;
     
     public UserInfo()
     {
-        ratings = new Dictionary<uint, float?>();
+        ratings = new Dictionary<uint, float>();
+    }
+
+    public bool RatingExists(uint movieID)
+    {
+        if(ratings.ContainsKey(movieID))
+            return true;
+        return false;
     }
 
     public void AddRating(uint movieID, float rating)
@@ -14,11 +21,13 @@ public class UserInfo
         ratings.Add(movieID, rating);
     }
 
-    public float? GetRating(uint movieID)
+    public float GetRating(uint movieID)
     {
-        if(ratings[movieID] != null)
-            return ratings[movieID];
-        else
-            throw new KeyNotFoundException();
+        return ratings[movieID];
+    }
+
+    public Dictionary<uint, float> GetDataset()
+    {
+        return ratings;
     }
 }
