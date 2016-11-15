@@ -10,15 +10,17 @@ namespace ConsoleApplication
         {
             // Used to read the text files.
             StreamReader movieStream = new StreamReader(new FileStream("netflix/movie_titles.txt", FileMode.Open));
-            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
-            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
-            StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-1.txt", FileMode.Open));
-            StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-1.txt", FileMode.Open));
+            StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
+            StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
+            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-1.txt", FileMode.Open));
+            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-1.txt", FileMode.Open));
             
             // Container objects
             Movies movies = new Movies();
             Users trainingUsers = new Users();
             Users testingUsers = new Users();
+
+            Computation computation = new Computation();
 
             Console.WriteLine("Populating movie database...");
             while(!movieStream.EndOfStream)
@@ -72,7 +74,77 @@ namespace ConsoleApplication
                 }
             }
 
-            Computation computation = new Computation();
+            Console.WriteLine("\nCommands:\nerror - computes the " +
+            "error on each instance of the training set compared to the test set." +
+            "\nexit - quits the program." +
+            "\ncommand - displays all available commands." +
+            "\nquery - allows you to perform queries as a user on a particular year.");
+
+            string input = "";
+            do
+            {
+                input = Console.ReadLine();
+                switch(input)
+                {
+                    case "command":
+                        Console.WriteLine("\nCommands:\nerror - computes the " +
+                        "error on each instance of the training set compared to the test set." +
+                        "\nexit - quits the program." +
+                        "\ncommand - displays all available commands." +
+                        "\nquery - allows you to perform queries as a user on a particular year.");
+                        break;
+                    case "error":
+                        Console.WriteLine("\nComputing the error with regards to the test set.");
+                        
+                        // For each user we must go through each of their ratings and make a prediction.
+                        foreach(KeyValuePair<uint, UserInfo> users in testingUsers.GetDataset())
+                        {
+                            foreach(KeyValuePair<uint, float> ratings in users.Value.GetDataset())
+                            {
+                                
+                            }    
+                        }
+                        break;
+                    case "query":
+                        Console.Write("Enter a userID: ");
+                        uint userID = uint.Parse(Console.ReadLine());
+                        Console.Write("Enter a particular year: ");
+                        uint year = uint.Parse(Console.ReadLine());
+
+                        if(testingUsers.UserExists(userID))
+                        {
+                            Console.WriteLine("\nMovies you have watched:");
+                            foreach(KeyValuePair<uint, float> movie in testingUsers.GetUser(userID).GetDataset())
+                            {
+                                if(movies.MovieExists(movie.Key))
+                                {
+                                    Console.WriteLine(movies.GetMovie(movie.Key).Title + ", " + 
+                                    movies.GetMovie(movie.Key).Year + ": " + movie.Value);
+                                }
+                            }
+
+                            // Gather the movies only produced in that particular year.
+                            Movies particularMovies = new Movies();
+                            foreach(KeyValuePair<uint, MovieInfo> movie in movies.GetDataset())
+                                if(year == movie.Value.Year)
+                                    particularMovies.AddMovie(movie.Key, movie.Value);
+
+                            // Now we perform analysis on each of these movies.
+                            
+                        }
+                        else
+                            Console.WriteLine("Invalid userID");
+                        break;
+                    case "exit":
+                        Console.WriteLine("Exiting database...");
+                        break;
+                    default:
+                        Console.WriteLine("Unknown value has been input.");
+                        break;
+                }
+            } while(input != "exit");
+
+            /*
             foreach(KeyValuePair<uint, UserInfo> users in testingUsers.GetDataset())
             {
                 for(uint i = 0; i < movies.GetDataset().Count; i++)
@@ -89,8 +161,10 @@ namespace ConsoleApplication
                     }
                 }
             }
+            */
             //Console.WriteLine("Average vote of other users (excluding userID 361407) for movieID 8: " + computation.WeightedSumOfOtherUsers(trainingUsers, 361407, 8));
             //Console.WriteLine("Correlation between userID's 361407 and 1205593: " + computation.Correlation(movies, trainingUsers.GetUser(361407), trainingUsers.GetUser(1205593)));
+            
         }
     }
 }
