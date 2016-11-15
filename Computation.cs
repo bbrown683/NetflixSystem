@@ -22,8 +22,6 @@ public class Computation
             // if either are zero, calculations are unnecessary.
             if(aRating != 0.0f || iRating != 0.0f)
             {
-                //Console.WriteLine(movieID + ": " + aRating + ", " + iRating);
-
                 float aNormalizedRating = 0.0f;
                 float iNormalizedRating = 0.0f;
 
@@ -47,10 +45,23 @@ public class Computation
 
     public float MeanAbsoluteError(float predictedRating, float trueRating)
     {
-        return 0.0f;
+        return trueRating - predictedRating;
     }
 
-    public float MeanRating(UserInfo v)
+    public float MeanRating(Users training, Users testing)
+    {
+        float mean = 0;
+        uint numUsers = 0;
+
+        foreach(KeyValuePair<uint, UserInfo> user in training.GetDataset())
+        {
+            numUsers++;
+        }
+
+        return mean / numUsers;
+    }
+
+    public float PredictedRating(float testingRating, float correlation, float weightedSum)
     {
         return 0.0f;
     }
@@ -60,11 +71,12 @@ public class Computation
         uint numRatings = 0;
         float sumRatings = 0.0f;
 
-        foreach(KeyValuePair<uint, UserInfo> data in users.GetDataset())
+        foreach(KeyValuePair<uint, UserInfo> user in users.GetDataset())
         {
-            if(data.Key != activeUserID)
+            if(user.Key != activeUserID)
             {
-                float rating = users.GetRatingForUser(data.Key, movieID);
+                float rating = users.GetRatingForUser(user.Key, movieID);
+                    
                 if(rating != 0.0f)
                 {
                     numRatings++;
@@ -73,6 +85,8 @@ public class Computation
             }
         }
 
-        return sumRatings / numRatings;
+        // there is a possibility that there is no other ratings for this movie.
+        float sum = sumRatings / numRatings;
+        return sum > 0.0f ? sum : 0.0f;
     }
 }

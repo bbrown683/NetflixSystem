@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace ConsoleApplication
@@ -9,12 +10,15 @@ namespace ConsoleApplication
         {
             // Used to read the text files.
             StreamReader movieStream = new StreamReader(new FileStream("netflix/movie_titles.txt", FileMode.Open));
-            StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
-            StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
+            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
+            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
+            StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-1.txt", FileMode.Open));
+            StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-1.txt", FileMode.Open));
             
             // Container objects
             Movies movies = new Movies();
-            Users users = new Users();
+            Users trainingUsers = new Users();
+            Users testingUsers = new Users();
 
             Console.WriteLine("Populating movie database...");
             while(!movieStream.EndOfStream)
@@ -38,32 +42,55 @@ namespace ConsoleApplication
                 float rating = float.Parse(trainingData[2]);
 
                 // Check to see if user already exists in the dictionary.
-                if(users.UserExists(userID))
-                    users.GetUser(userID).AddRating(movieID, rating);
+                if(trainingUsers.UserExists(userID))
+                    trainingUsers.GetUser(userID).AddRating(movieID, rating);
                 else
                 {
                     // Add user and rating
-                    users.AddUser(userID, new UserInfo());
-                    users.GetUser(userID).AddRating(movieID, rating);
+                    trainingUsers.AddUser(userID, new UserInfo());
+                    trainingUsers.GetUser(userID).AddRating(movieID, rating);
                 }
             }
 
-            /*    
-            if(movies.MovieExists(16))
-                Console.WriteLine(movies.GetMovie(16).Title);
+            Console.WriteLine("Populating testing database...");
+            while(!userTestingStream.EndOfStream)
+            {
+                string[] testingData = userTestingStream.ReadLine().Split(',');
 
-            Console.WriteLine(users.GetUser(411537).GetRating(8));
-        
-            if(users.GetRatingForUser(1748849, 8) != 0.0f)
-                Console.WriteLine("Rating does exist");
-            else
-                Console.WriteLine("Rating does not exist");
-            */
+                uint movieID = uint.Parse(testingData[0]);
+                uint userID = uint.Parse(testingData[1]);
+                float rating = float.Parse(testingData[2]);
+
+                // Check to see if user already exists in the dictionary.
+                if(testingUsers.UserExists(userID))
+                    testingUsers.GetUser(userID).AddRating(movieID, rating);
+                else
+                {
+                    // Add user and rating
+                    testingUsers.AddUser(userID, new UserInfo());
+                    testingUsers.GetUser(userID).AddRating(movieID, rating);
+                }
+            }
 
             Computation computation = new Computation();
-            Console.WriteLine("Average vote of other users (excluding userID 361407) for movieID 8: " + computation.WeightedSumOfOtherUsers(users, 361407, 8));
-            
-            Console.WriteLine("Correlation between userID's 361407 and 1205593: " + computation.Correlation(movies, users.GetUser(361407), users.GetUser(1205593)));
+            foreach(KeyValuePair<uint, UserInfo> users in testingUsers.GetDataset())
+            {
+                for(uint i = 0; i < movies.GetDataset().Count; i++)
+                {
+                    if(users.Value.RatingExists(i))
+                        Console.WriteLine("Weighted sum for user " + users.Key + ": " + computation.WeightedSumOfOtherUsers(testingUsers, users.Key, i));
+                }
+
+                foreach(KeyValuePair<uint, UserInfo> otherUsers in testingUsers.GetDataset())
+                {
+                    if(users.Key != otherUsers.Key)
+                    {
+                        Console.WriteLine(computation.Correlation(movies, users.Value, otherUsers.Value));
+                    }
+                }
+            }
+            //Console.WriteLine("Average vote of other users (excluding userID 361407) for movieID 8: " + computation.WeightedSumOfOtherUsers(trainingUsers, 361407, 8));
+            //Console.WriteLine("Correlation between userID's 361407 and 1205593: " + computation.Correlation(movies, trainingUsers.GetUser(361407), trainingUsers.GetUser(1205593)));
         }
     }
 }
