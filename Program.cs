@@ -10,10 +10,10 @@ namespace ConsoleApplication
         {
             // Used to read the text files.
             StreamReader movieStream = new StreamReader(new FileStream("netflix/movie_titles.txt", FileMode.Open));
-            StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
-            StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
-            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-1.txt", FileMode.Open));
-            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-1.txt", FileMode.Open));
+            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
+            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
+            StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-1.txt", FileMode.Open));
+            StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-1.txt", FileMode.Open));
             
             // Container objects
             Movies movies = new Movies();
@@ -83,6 +83,7 @@ namespace ConsoleApplication
             string input = "";
             do
             {
+                Console.Write(">>>");
                 input = Console.ReadLine();
                 switch(input)
                 {
@@ -101,7 +102,9 @@ namespace ConsoleApplication
                         {
                             foreach(KeyValuePair<uint, float> ratings in users.Value.GetDataset())
                             {
-                                
+                                Console.WriteLine("userID " + users.Key + "\nmovieID " + ratings.Key);
+                                Console.WriteLine("Mean Absolute Error: ");
+                                Console.WriteLine("Root Mean Squared Error: " + "\n");
                             }    
                         }
                         break;

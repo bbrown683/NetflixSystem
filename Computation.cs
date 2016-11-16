@@ -3,8 +3,7 @@ using System.Collections.Generic;
 
 public class Computation
 {
-    // Correlation gives us the similarity between two users
-    // a and i as a float between -1 and 1.
+    // Correlation gives us the similarity between two users a and i.
     public float Correlation(Movies movies, UserInfo a, UserInfo i)
     {
         float correlation = 0.0f;
@@ -45,7 +44,7 @@ public class Computation
 
     public float MeanAbsoluteError(float predictedRating, float trueRating)
     {
-        return trueRating - predictedRating;
+        return (float)Math.Abs(trueRating - predictedRating);
     }
 
     public float MeanRating(Users training, Users testing)
