@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq.Expressions;
 
 namespace ConsoleApplication
 {
@@ -10,10 +11,10 @@ namespace ConsoleApplication
         {
             // Used to read the text files.
             StreamReader movieStream = new StreamReader(new FileStream("netflix/movie_titles.txt", FileMode.Open));
-            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
-            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
-            StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-1.txt", FileMode.Open));
-            StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-1.txt", FileMode.Open));
+            StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
+            StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
+            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-1.txt", FileMode.Open));
+            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-1.txt", FileMode.Open));
             
             // Container objects
             Movies movies = new Movies();
@@ -21,6 +22,7 @@ namespace ConsoleApplication
             Users testingUsers = new Users();
 
             Computation computation = new Computation();
+            Dictionary<Tuple<UserInfo, UserInfo>, float> weight = new Dictionary<Tuple<UserInfo, UserInfo>, float>();
 
             Console.WriteLine("Populating movie database...");
             while(!movieStream.EndOfStream)
@@ -75,7 +77,7 @@ namespace ConsoleApplication
             }
 
             Console.WriteLine("\nCommands:\nerror - computes the " +
-            "error on each instance of the training set compared to the test set." +
+            "error on each instance of the test set on the training set." +
             "\nexit - quits the program." +
             "\ncommand - displays all available commands." +
             "\nquery - allows you to perform queries as a user on a particular year.");
@@ -89,7 +91,7 @@ namespace ConsoleApplication
                 {
                     case "command":
                         Console.WriteLine("\nCommands:\nerror - computes the " +
-                        "error on each instance of the training set compared to the test set." +
+                        "error on each instance of the test set on the training set." +
                         "\nexit - quits the program." +
                         "\ncommand - displays all available commands." +
                         "\nquery - allows you to perform queries as a user on a particular year.");
@@ -102,10 +104,10 @@ namespace ConsoleApplication
                         {
                             foreach(KeyValuePair<uint, float> ratings in users.Value.GetDataset())
                             {
-                                Console.WriteLine("userID " + users.Key + "\nmovieID " + ratings.Key);
+                                Console.WriteLine("userID: " + users.Key + "\nmovieID: " + ratings.Key);
                                 Console.WriteLine("Mean Absolute Error: ");
                                 Console.WriteLine("Root Mean Squared Error: " + "\n");
-                            }    
+                            } 
                         }
                         break;
                     case "query":
@@ -114,10 +116,10 @@ namespace ConsoleApplication
                         Console.Write("Enter a particular year: ");
                         uint year = uint.Parse(Console.ReadLine());
 
-                        if(testingUsers.UserExists(userID))
+                        if(trainingUsers.UserExists(userID))
                         {
                             Console.WriteLine("\nMovies you have watched:");
-                            foreach(KeyValuePair<uint, float> movie in testingUsers.GetUser(userID).GetDataset())
+                            foreach(KeyValuePair<uint, float> movie in trainingUsers.GetUser(userID).GetDataset())
                             {
                                 if(movies.MovieExists(movie.Key))
                                 {
@@ -125,6 +127,8 @@ namespace ConsoleApplication
                                     movies.GetMovie(movie.Key).Year + ": " + movie.Value);
                                 }
                             }
+                            
+                            Console.WriteLine("Average rating is: " + computation.WeightedSumOfUser(trainingUsers.GetUser(userID)));
 
                             // Gather the movies only produced in that particular year.
                             Movies particularMovies = new Movies();
@@ -133,7 +137,41 @@ namespace ConsoleApplication
                                     particularMovies.AddMovie(movie.Key, movie.Value);
 
                             // Now we perform analysis on each of these movies.
+                            uint test0 = 0;
+                            uint test1 = 0;
+                            foreach(KeyValuePair<uint, UserInfo> user in trainingUsers.GetDataset())
+                            {
+                                float correlation = computation.Correlation(particularMovies, trainingUsers.GetUser(userID), user.Value);
+                                if(correlation > 0)
+                                {
+                                    Tuple<UserInfo, UserInfo> tupleCorrelation = new Tuple<UserInfo, UserInfo>(trainingUsers.GetUser(userID), user.Value);
+                                    // sort by userID. so we have a distinct set.
+                                    if(userID <= user.Key)
+                                        tupleCorrelation = new Tuple<UserInfo, UserInfo>(trainingUsers.GetUser(userID), user.Value);
+                                    else
+                                        tupleCorrelation = new Tuple<UserInfo, UserInfo>(user.Value, trainingUsers.GetUser(userID));
+                                    test0++;
+                                    // store weights in dictionary with the users as the key.
+                                    if(!weight.ContainsKey(tupleCorrelation))
+                                    {
+                                        weight.Add(tupleCorrelation, correlation);
                             
+                                    }
+                                }
+                                /*
+                                foreach(KeyValuePair<uint, MovieInfo> movie in particularMovies.GetDataset())
+                                {
+                                    if(user.Value.RatingExists(movie.Key))
+                                    {
+                                        //Console.WriteLine(movie.Value.Title + ", " + movie.Value.Year);
+                                        //float weightedSum = computation.WeightedSumOfOtherUsers(trainingUsers, userID, movie.Key);
+                                        //Console.WriteLine("WeightedSum: " + weightedSum);
+                                    }
+                                }
+                                */
+                            }
+                            Console.WriteLine(weight.Count);
+                            Console.WriteLine(test0 + ", " + test1);               
                         }
                         else
                             Console.WriteLine("Invalid userID");
@@ -146,28 +184,6 @@ namespace ConsoleApplication
                         break;
                 }
             } while(input != "exit");
-
-            /*
-            foreach(KeyValuePair<uint, UserInfo> users in testingUsers.GetDataset())
-            {
-                for(uint i = 0; i < movies.GetDataset().Count; i++)
-                {
-                    if(users.Value.RatingExists(i))
-                        Console.WriteLine("Weighted sum for user " + users.Key + ": " + computation.WeightedSumOfOtherUsers(testingUsers, users.Key, i));
-                }
-
-                foreach(KeyValuePair<uint, UserInfo> otherUsers in testingUsers.GetDataset())
-                {
-                    if(users.Key != otherUsers.Key)
-                    {
-                        Console.WriteLine(computation.Correlation(movies, users.Value, otherUsers.Value));
-                    }
-                }
-            }
-            */
-            //Console.WriteLine("Average vote of other users (excluding userID 361407) for movieID 8: " + computation.WeightedSumOfOtherUsers(trainingUsers, 361407, 8));
-            //Console.WriteLine("Correlation between userID's 361407 and 1205593: " + computation.Correlation(movies, trainingUsers.GetUser(361407), trainingUsers.GetUser(1205593)));
-            
         }
     }
 }

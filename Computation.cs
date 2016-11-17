@@ -8,15 +8,15 @@ public class Computation
     {
         float correlation = 0.0f;
         
-        for(uint movieID = 1; movieID <= movies.GetDataset().Count; movieID++)
+        foreach(KeyValuePair<uint, MovieInfo> movie in movies.GetDataset())
         {
             float aRating = 0.0f;
             float iRating = 0.0f;
 
-            if(a.RatingExists(movieID))
-                aRating = a.GetRating(movieID);
-            if(i.RatingExists(movieID))
-                iRating = i.GetRating(movieID);
+            if(a.RatingExists(movie.Key))
+                aRating = a.GetRating(movie.Key);
+            if(i.RatingExists(movie.Key))
+                iRating = i.GetRating(movie.Key);
 
             // if either are zero, calculations are unnecessary.
             if(aRating != 0.0f || iRating != 0.0f)
@@ -65,6 +65,21 @@ public class Computation
         return 0.0f;
     }
 
+    // Returns the average rating of the current user.
+    public float WeightedSumOfUser(UserInfo user)
+    {
+        uint numRatings = 0;
+        float sumRatings = 0.0f;
+        foreach(KeyValuePair<uint, float> rating in user.GetDataset())
+        {
+            sumRatings += rating.Value;
+            numRatings++;
+        }
+
+        return sumRatings / numRatings;
+    }
+
+    // This function returns the average rating of other users on a movie excluding the active users rating.
     public float WeightedSumOfOtherUsers(Users users, uint activeUserID, uint movieID)
     {
         uint numRatings = 0;
