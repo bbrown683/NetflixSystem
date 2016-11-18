@@ -4,6 +4,8 @@ using System.Collections.Generic;
 public class Computation
 {
     // Correlation gives us the similarity between two users a and i.
+    // Can range between 0 and 1 where 0 is that they share nothing in
+    // common and 1 is where they share everything in common.
     public float Correlation(Movies movies, UserInfo a, UserInfo i)
     {
         float correlation = 0.0f;
@@ -68,39 +70,24 @@ public class Computation
     // Returns the average rating of the current user.
     public float WeightedSumOfUser(UserInfo user)
     {
-        uint numRatings = 0;
         float sumRatings = 0.0f;
         foreach(KeyValuePair<uint, float> rating in user.GetDataset())
         {
             sumRatings += rating.Value;
-            numRatings++;
         }
 
-        return sumRatings / numRatings;
+        return sumRatings / Math.Abs(user.GetDataset().Count);
     }
 
-    // This function returns the average rating of other users on a movie excluding the active users rating.
-    public float WeightedSumOfOtherUsers(Users users, uint activeUserID, uint movieID)
+    public float SumWeight(Dictionary<Tuple<uint, uint>, float> weight)
     {
-        uint numRatings = 0;
-        float sumRatings = 0.0f;
-
-        foreach(KeyValuePair<uint, UserInfo> user in users.GetDataset())
+        float sumWeights = 0.0f; 
+        
+        foreach(KeyValuePair<Tuple<uint, uint>, float> w in weight)
         {
-            if(user.Key != activeUserID)
-            {
-                float rating = users.GetRatingForUser(user.Key, movieID);
-                    
-                if(rating != 0.0f)
-                {
-                    numRatings++;
-                    sumRatings += rating;
-                }
-            }
+            sumWeights += w.Value;
         }
 
-        // there is a possibility that there is no other ratings for this movie.
-        float sum = sumRatings / numRatings;
-        return sum > 0.0f ? sum : 0.0f;
+        return sumWeights;
     }
 }

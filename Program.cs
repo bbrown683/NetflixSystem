@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq.Expressions;
 
 namespace ConsoleApplication
 {
@@ -13,8 +12,8 @@ namespace ConsoleApplication
             StreamReader movieStream = new StreamReader(new FileStream("netflix/movie_titles.txt", FileMode.Open));
             StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
             StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
-            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-1.txt", FileMode.Open));
-            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-1.txt", FileMode.Open));
+            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-10.txt", FileMode.Open));
+            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-10.txt", FileMode.Open));
             
             // Container objects
             Movies movies = new Movies();
@@ -22,7 +21,9 @@ namespace ConsoleApplication
             Users testingUsers = new Users();
 
             Computation computation = new Computation();
-            Dictionary<Tuple<UserInfo, UserInfo>, float> weight = new Dictionary<Tuple<UserInfo, UserInfo>, float>();
+
+            // stores the weights (correlation) between two users.
+            Dictionary<Tuple<uint, uint>, float> weight;
 
             Console.WriteLine("Populating movie database...");
             while(!movieStream.EndOfStream)
@@ -97,6 +98,8 @@ namespace ConsoleApplication
                         "\nquery - allows you to perform queries as a user on a particular year.");
                         break;
                     case "error":
+                        weight = new Dictionary<Tuple<uint, uint>, float>();
+
                         Console.WriteLine("\nComputing the error with regards to the test set.");
                         
                         // For each user we must go through each of their ratings and make a prediction.
@@ -111,67 +114,66 @@ namespace ConsoleApplication
                         }
                         break;
                     case "query":
+                        weight = new Dictionary<Tuple<uint, uint>, float>();
+                        
                         Console.Write("Enter a userID: ");
                         uint userID = uint.Parse(Console.ReadLine());
                         Console.Write("Enter a particular year: ");
                         uint year = uint.Parse(Console.ReadLine());
 
+                        List<float> predictedRatings = new List<float>();
+
                         if(trainingUsers.UserExists(userID))
                         {
                             Console.WriteLine("\nMovies you have watched:");
                             foreach(KeyValuePair<uint, float> movie in trainingUsers.GetUser(userID).GetDataset())
-                            {
                                 if(movies.MovieExists(movie.Key))
-                                {
-                                    Console.WriteLine(movies.GetMovie(movie.Key).Title + ", " + 
-                                    movies.GetMovie(movie.Key).Year + ": " + movie.Value);
-                                }
-                            }
+                                    Console.WriteLine(movie.Key + " - " + movies.GetMovie(movie.Key).Title + ", " + 
+                                        movies.GetMovie(movie.Key).Year + ": " + movie.Value);
                             
-                            Console.WriteLine("Average rating is: " + computation.WeightedSumOfUser(trainingUsers.GetUser(userID)));
-
                             // Gather the movies only produced in that particular year.
                             Movies particularMovies = new Movies();
                             foreach(KeyValuePair<uint, MovieInfo> movie in movies.GetDataset())
                                 if(year == movie.Value.Year)
                                     particularMovies.AddMovie(movie.Key, movie.Value);
-
-                            // Now we perform analysis on each of these movies.
-                            uint test0 = 0;
-                            uint test1 = 0;
-                            foreach(KeyValuePair<uint, UserInfo> user in trainingUsers.GetDataset())
-                            {
-                                float correlation = computation.Correlation(particularMovies, trainingUsers.GetUser(userID), user.Value);
-                                if(correlation > 0)
-                                {
-                                    Tuple<UserInfo, UserInfo> tupleCorrelation = new Tuple<UserInfo, UserInfo>(trainingUsers.GetUser(userID), user.Value);
-                                    // sort by userID. so we have a distinct set.
-                                    if(userID <= user.Key)
-                                        tupleCorrelation = new Tuple<UserInfo, UserInfo>(trainingUsers.GetUser(userID), user.Value);
-                                    else
-                                        tupleCorrelation = new Tuple<UserInfo, UserInfo>(user.Value, trainingUsers.GetUser(userID));
-                                    test0++;
-                                    // store weights in dictionary with the users as the key.
-                                    if(!weight.ContainsKey(tupleCorrelation))
-                                    {
-                                        weight.Add(tupleCorrelation, correlation);
                             
-                                    }
-                                }
-                                /*
-                                foreach(KeyValuePair<uint, MovieInfo> movie in particularMovies.GetDataset())
+                            // Computes the average rating of the active user.
+                            float averageRatingOfActive = computation.WeightedSumOfUser(trainingUsers.GetUser(userID));
+                            
+                            // Now we perform analysis on each of these movies.
+                            foreach(KeyValuePair<uint, MovieInfo> movie in particularMovies.GetDataset())
+                            {
+                                float predictedRating = 0.0f;
+                                float cumulativeSum = 0.0f;
+                                foreach(KeyValuePair<uint, UserInfo> user in trainingUsers.GetDataset())
                                 {
-                                    if(user.Value.RatingExists(movie.Key))
+                                    //Console.WriteLine("User: " + user.Key);
+                                    float correlation = computation.Correlation(particularMovies, trainingUsers.GetUser(userID), user.Value);
+                                    
+                                    // we only want nonzero weights to be included into the dictionary.
+                                    if(correlation > 0.0f)
                                     {
-                                        //Console.WriteLine(movie.Value.Title + ", " + movie.Value.Year);
-                                        //float weightedSum = computation.WeightedSumOfOtherUsers(trainingUsers, userID, movie.Key);
-                                        //Console.WriteLine("WeightedSum: " + weightedSum);
+                                        var tuple = new Tuple<uint, uint>(userID, user.Key);
+                                        // store weights in dictionary with the users as the key.
+                                        if(!weight.ContainsKey(tuple))
+                                            weight.Add(tuple, correlation);
+
+                                        if(user.Value.RatingExists(movie.Key))
+                                        {
+                                            cumulativeSum += correlation * (user.Value.GetRating(movie.Key) - 
+                                                computation.WeightedSumOfUser(user.Value));
+                                            //Console.WriteLine("cumulativeSum of movieID " + movie.Key + 
+                                            //" for userID " + user.Key + " is " + cumulativeSum);
+                                        }  
                                     }
                                 }
-                                */
+                                
+                                predictedRating = averageRatingOfActive + cumulativeSum / computation.SumWeight(weight);
+                                predictedRatings.Add(predictedRating);
+                                Console.WriteLine("PR of movieID " + movie.Key + " is " + predictedRating);   
                             }
-                            Console.WriteLine(weight.Count);
-                            Console.WriteLine(test0 + ", " + test1);               
+
+                            predictedRatings.Sort();
                         }
                         else
                             Console.WriteLine("Invalid userID");
