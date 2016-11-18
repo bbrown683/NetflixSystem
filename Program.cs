@@ -12,8 +12,8 @@ namespace ConsoleApplication
             StreamReader movieStream = new StreamReader(new FileStream("netflix/movie_titles.txt", FileMode.Open));
             StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
             StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
-            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-10.txt", FileMode.Open));
-            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-10.txt", FileMode.Open));
+            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-1.txt", FileMode.Open));
+            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-1.txt", FileMode.Open));
             
             // Container objects
             Movies movies = new Movies();
@@ -140,6 +140,12 @@ namespace ConsoleApplication
                             // Computes the average rating of the active user.
                             float averageRatingOfActive = computation.WeightedSumOfUser(trainingUsers.GetUser(userID));
                             
+                            // Compute the weights and store them.
+                            foreach(KeyValuePair<uint, UserInfo> user in trainingUsers.GetDataset())
+                            {
+                                float correlation = computation.Correlation(movies, trainingUsers.GetUser(userID), user.Value);    
+                            }
+
                             // Now we perform analysis on each of these movies.
                             foreach(KeyValuePair<uint, MovieInfo> movie in particularMovies.GetDataset())
                             {
@@ -147,13 +153,14 @@ namespace ConsoleApplication
                                 float cumulativeSum = 0.0f;
                                 foreach(KeyValuePair<uint, UserInfo> user in trainingUsers.GetDataset())
                                 {
-                                    //Console.WriteLine("User: " + user.Key);
-                                    float correlation = computation.Correlation(particularMovies, trainingUsers.GetUser(userID), user.Value);
+                                    // Compute their correlation accross all moves in the database rather than the particular movies.
+                                    float correlation = computation.Correlation(movies, trainingUsers.GetUser(userID), user.Value);
                                     
                                     // we only want nonzero weights to be included into the dictionary.
                                     if(correlation > 0.0f)
                                     {
                                         var tuple = new Tuple<uint, uint>(userID, user.Key);
+
                                         // store weights in dictionary with the users as the key.
                                         if(!weight.ContainsKey(tuple))
                                             weight.Add(tuple, correlation);
@@ -162,13 +169,11 @@ namespace ConsoleApplication
                                         {
                                             cumulativeSum += correlation * (user.Value.GetRating(movie.Key) - 
                                                 computation.WeightedSumOfUser(user.Value));
-                                            //Console.WriteLine("cumulativeSum of movieID " + movie.Key + 
-                                            //" for userID " + user.Key + " is " + cumulativeSum);
                                         }  
                                     }
                                 }
                                 
-                                predictedRating = averageRatingOfActive + cumulativeSum / computation.SumWeight(weight);
+                                predictedRating = averageRatingOfActive + (cumulativeSum / computation.SumWeight(weight));
                                 predictedRatings.Add(predictedRating);
                                 Console.WriteLine("PR of movieID " + movie.Key + " is " + predictedRating);   
                             }

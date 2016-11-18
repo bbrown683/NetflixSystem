@@ -6,11 +6,13 @@ public class Computation
     // Correlation gives us the similarity between two users a and i.
     // Can range between 0 and 1 where 0 is that they share nothing in
     // common and 1 is where they share everything in common.
+    /*
     public float Correlation(Movies movies, UserInfo a, UserInfo i)
     {
         float correlation = 0.0f;
         
-        foreach(KeyValuePair<uint, MovieInfo> movie in movies.GetDataset())
+        Movies ratedMovies = MoviesRatedByBoth(movies, a, i);
+        foreach(KeyValuePair<uint, MovieInfo> movie in ratedMovies.GetDataset())
         {
             float aRating = 0.0f;
             float iRating = 0.0f;
@@ -43,6 +45,50 @@ public class Computation
 
         return correlation;
     }
+    */
+
+    // Correlation gives us the similarity between two users a and i.
+    // Can range between 0 and 1 where 0 is that they share nothing in
+    // common and 1 is where they share everything in common.
+    public float Correlation(Movies movies, UserInfo a, UserInfo i)
+    {
+        Movies ratedMovies = MoviesRatedByBoth(movies, a, i);
+
+        // Compute the average ratings for the set of rated movies.
+        float aAverageRating = 0.0f;
+        float iAverageRating = 0.0f;
+        foreach(KeyValuePair<uint, MovieInfo> movie in ratedMovies.GetDataset())
+        {
+            aAverageRating += a.GetRating(movie.Key);
+            iAverageRating += i.GetRating(movie.Key);
+        }
+
+        aAverageRating = aAverageRating / ratedMovies.GetDataset().Count;
+        iAverageRating = iAverageRating / ratedMovies.GetDataset().Count;
+
+        float topResult = 0.0f;
+        float bottomResult = 0.0f;
+        foreach(KeyValuePair<uint, MovieInfo> movie in ratedMovies.GetDataset())
+        {
+            topResult += (a.GetRating(movie.Key) - aAverageRating) * (i.GetRating(movie.Key) - iAverageRating);
+            bottomResult += ((a.GetRating(movie.Key) - aAverageRating) * (a.GetRating(movie.Key) - aAverageRating) *
+            (i.GetRating(movie.Key) - iAverageRating) * (i.GetRating(movie.Key) - iAverageRating));  
+        } 
+ 
+        return (topResult / (float)(Math.Sqrt(bottomResult)));
+    }
+
+
+    public Movies MoviesRatedByBoth(Movies movies, UserInfo a, UserInfo i)
+    {
+        Movies ratedMovies = new Movies();
+        
+        foreach(KeyValuePair<uint, MovieInfo> movie in movies.GetDataset())
+            if(a.RatingExists(movie.Key) && i.RatingExists(movie.Key))
+                ratedMovies.AddMovie(movie.Key, movie.Value);
+
+        return ratedMovies;
+    }
 
     public float MeanAbsoluteError(float predictedRating, float trueRating)
     {
@@ -60,11 +106,6 @@ public class Computation
         }
 
         return mean / numUsers;
-    }
-
-    public float PredictedRating(float testingRating, float correlation, float weightedSum)
-    {
-        return 0.0f;
     }
 
     // Returns the average rating of the current user.
