@@ -3,52 +3,42 @@ using System.Collections.Generic;
 
 public class Computation
 {
+    /*
+    // Algorithm 3.
     // Correlation gives us the similarity between two users a and i.
     // Can range between 0 and 1 where 0 is that they share nothing in
     // common and 1 is where they share everything in common.
-    /*
     public float Correlation(Movies movies, UserInfo a, UserInfo i)
     {
         float correlation = 0.0f;
         
+        // we normalize the ratings of the users.
+        float aNormalizedRating = 0.0f;
+        float iNormalizedRating = 0.0f;
+            
+        foreach(KeyValuePair<uint, float> aUserData in a.GetDataset())
+            aNormalizedRating += aUserData.Value * aUserData.Value;    
+
+        foreach(KeyValuePair<uint, float> iUserData in i.GetDataset())
+            iNormalizedRating += iUserData.Value * iUserData.Value;
+
         Movies ratedMovies = MoviesRatedByBoth(movies, a, i);
         foreach(KeyValuePair<uint, MovieInfo> movie in ratedMovies.GetDataset())
         {
-            float aRating = 0.0f;
-            float iRating = 0.0f;
+            float aRating = a.GetRating(movie.Key);
+            float iRating = i.GetRating(movie.Key);
 
-            if(a.RatingExists(movie.Key))
-                aRating = a.GetRating(movie.Key);
-            if(i.RatingExists(movie.Key))
-                iRating = i.GetRating(movie.Key);
-
-            // if either are zero, calculations are unnecessary.
-            if(aRating != 0.0f || iRating != 0.0f)
-            {
-                float aNormalizedRating = 0.0f;
-                float iNormalizedRating = 0.0f;
-
-                foreach(KeyValuePair<uint, float> aUserData in a.GetDataset())
-                {
-                    aNormalizedRating += aUserData.Value * aUserData.Value;    
-                }  
-
-                foreach(KeyValuePair<uint, float> iUserData in i.GetDataset())
-                {
-                    iNormalizedRating += iUserData.Value * iUserData.Value;
-                }
-
-                correlation += (aRating / (float)Math.Sqrt(aNormalizedRating)) * 
-                    (iRating / (float)Math.Sqrt(iNormalizedRating));
-            }
+            correlation += (aRating / (float)Math.Sqrt(aNormalizedRating)) * 
+                (iRating / (float)Math.Sqrt(iNormalizedRating));
         }
 
         return correlation;
     }
     */
 
+    // Algorithm 2.
     // Correlation gives us the similarity between two users a and i.
-    // Can range between 0 and 1 where 0 is that they share nothing in
+    // Can range between -1 and 1 where 0 is that they share nothing in
     // common and 1 is where they share everything in common.
     public float Correlation(Movies movies, UserInfo a, UserInfo i)
     {
@@ -67,17 +57,19 @@ public class Computation
         iAverageRating = iAverageRating / ratedMovies.GetDataset().Count;
 
         float topResult = 0.0f;
-        float bottomResult = 0.0f;
+        float bottomAResult = 0.0f;
+        float bottomIResult = 0.0f;
         foreach(KeyValuePair<uint, MovieInfo> movie in ratedMovies.GetDataset())
         {
             topResult += (a.GetRating(movie.Key) - aAverageRating) * (i.GetRating(movie.Key) - iAverageRating);
-            bottomResult += ((a.GetRating(movie.Key) - aAverageRating) * (a.GetRating(movie.Key) - aAverageRating) *
-            (i.GetRating(movie.Key) - iAverageRating) * (i.GetRating(movie.Key) - iAverageRating));  
+            bottomAResult += (a.GetRating(movie.Key) - aAverageRating) * (a.GetRating(movie.Key) - aAverageRating);
+            bottomIResult += (i.GetRating(movie.Key) - iAverageRating) * (i.GetRating(movie.Key) - iAverageRating);  
         } 
- 
-        return (topResult / (float)(Math.Sqrt(bottomResult)));
-    }
+        
+        float correlation = (topResult / (float)(Math.Sqrt(bottomAResult) * Math.Sqrt(bottomIResult)));
 
+        return correlation;
+    }
 
     public Movies MoviesRatedByBoth(Movies movies, UserInfo a, UserInfo i)
     {
@@ -108,7 +100,7 @@ public class Computation
         return mean / numUsers;
     }
 
-    // Returns the average rating of the current user.
+    // Returns the average rating of the current user on a set of movies.
     public float WeightedSumOfUser(UserInfo user)
     {
         float sumRatings = 0.0f;
@@ -117,7 +109,7 @@ public class Computation
             sumRatings += rating.Value;
         }
 
-        return sumRatings / Math.Abs(user.GetDataset().Count);
+        return sumRatings / user.GetDataset().Count;
     }
 
     public float SumWeight(Dictionary<Tuple<uint, uint>, float> weight)
@@ -125,9 +117,7 @@ public class Computation
         float sumWeights = 0.0f; 
         
         foreach(KeyValuePair<Tuple<uint, uint>, float> w in weight)
-        {
-            sumWeights += w.Value;
-        }
+            sumWeights += Math.Abs(w.Value);
 
         return sumWeights;
     }
