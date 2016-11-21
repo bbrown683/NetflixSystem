@@ -11,10 +11,10 @@ namespace ConsoleApplication
         {
             // Used to read the text files.
             StreamReader movieStream = new StreamReader(new FileStream("netflix/movie_titles.txt", FileMode.Open));
-            StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
-            StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
-            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-1.txt", FileMode.Open));
-            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-1.txt", FileMode.Open));
+            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
+            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
+            StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-new.txt", FileMode.Open));
+            StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-new.txt", FileMode.Open));
             
             // Container objects
             Movies movies = new Movies();
@@ -78,8 +78,6 @@ namespace ConsoleApplication
                 }
             }
 
-            Console.WriteLine(computation.Correlation(movies, trainingUsers.GetUser(219481), trainingUsers.GetUser(219481)));
-
             Console.WriteLine("\nCommands:\nerror - computes the " +
             "error on each instance of the test set on the training set." +
             "\nexit - quits the program." +
@@ -103,28 +101,11 @@ namespace ConsoleApplication
                     case "error":
                         weight = new Dictionary<Tuple<uint, uint>, float>();
 
-                        Console.WriteLine("\nComputing the error with regards to the test set.");
+                        Console.WriteLine("\nComputing the error with regards to the test set. This may take a few minutes.");
 
                         float differenceRating = 0.0f;
+                        float differenceRatingSquared = 0.0f;
                         float numRatings = 0.0f; 
-
-                        // compute weights early to make predictions faster later.
-                        foreach(KeyValuePair<uint, UserInfo> users in testingUsers.GetDataset())
-                        {
-                             // Computes the average rating of the active user.
-                            float averageRatingOfActive = computation.WeightedSumOfUser(trainingUsers.GetUser(users.Key));
-
-                            // compute weights.
-                            foreach(KeyValuePair<uint, UserInfo> otherUsers in trainingUsers.GetDataset())
-                            {
-                                float correlation = computation.Correlation(movies, trainingUsers.GetUser(users.Key), otherUsers.Value);
-
-                                if(!weight.ContainsKey(new Tuple<uint, uint>(otherUsers.Key, users.Key)))
-                                    // exclude any zero correlations, and some numbers are just too small.
-                                    if(correlation != 0.0f && !float.IsNaN(correlation))
-                                        weight.Add(new Tuple<uint, uint>(users.Key, otherUsers.Key), correlation);
-                            }    
-                        }
 
                         foreach(KeyValuePair<uint, UserInfo> users in testingUsers.GetDataset())
                         {
@@ -166,22 +147,27 @@ namespace ConsoleApplication
                                         predictedRating = averageRatingOfActive + cumulativeSum / sumWeight;
                                     else
                                         predictedRating = averageRatingOfActive;
+                                    
+                                    // Logging.
                                     Console.WriteLine("==============================");
                                     Console.WriteLine("UserID: " + users.Key);
                                     Console.WriteLine("Predicted Rating of " + movies.GetMovie(ratings.Key).Title + " is " + predictedRating);
                                     Console.WriteLine("Actual Rating of " + movies.GetMovie(ratings.Key).Title + " is " + users.Value.GetRating(ratings.Key));
 
-                                    // this simply returns the difference in ratings and adds them up.
-                                    // we will divide by the number of ratings to get the actual mean error.
+                                    // These simply return the difference in ratings and adds them up.
+                                    // we will divide by the number of ratings to get the actual mean and squared error.
                                     differenceRating += computation.MeanAbsoluteError(predictedRating, users.Value.GetRating(ratings.Key));
+                                    differenceRatingSquared += computation.MeanAbsoluteError(predictedRating, users.Value.GetRating(ratings.Key)) * 
+                                        computation.MeanAbsoluteError(predictedRating, users.Value.GetRating(ratings.Key));
                                     numRatings++;
                                 }
                             }
-
-                            Console.WriteLine("\n");
                         }   
 
-                        Console.WriteLine(differenceRating / numRatings);
+                        float meanAbsoluteError = differenceRating / numRatings;
+                        float rootMeanSquaredError = (float)Math.Sqrt(differenceRatingSquared / numRatings);
+                        Console.WriteLine("MAE : " + meanAbsoluteError);
+                        Console.WriteLine("RMSE : " + rootMeanSquaredError);
 
                         break;
                     case "query":
@@ -240,7 +226,6 @@ namespace ConsoleApplication
                                                 computation.WeightedSumOfUser(trainingUsers.GetUser(weights.Key.Item2)));
                                     else
                                         cumulativeSum += weights.Value;    
-                                Console.WriteLine(cumulativeSum);   
                                 // odd occurrence when there is no other weights.
                                 if(sumWeight != 0.0f)
                                     predictedRating = averageRatingOfActive + cumulativeSum / sumWeight;
