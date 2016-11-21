@@ -13,8 +13,8 @@ namespace ConsoleApplication
             StreamReader movieStream = new StreamReader(new FileStream("netflix/movie_titles.txt", FileMode.Open));
             StreamReader userTestingStream = new StreamReader(new FileStream("netflix/TestingRatings.txt", FileMode.Open));
             StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/TrainingRatings.txt", FileMode.Open));
-            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-10.txt", FileMode.Open));
-            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-10.txt", FileMode.Open));
+            //StreamReader userTestingStream = new StreamReader(new FileStream("netflix/reduced/TestingRatings-1.txt", FileMode.Open));
+            //StreamReader userTrainingStream = new StreamReader(new FileStream("netflix/reduced/TrainingRatings-1.txt", FileMode.Open));
             
             // Container objects
             Movies movies = new Movies();
@@ -101,14 +101,17 @@ namespace ConsoleApplication
                         "\nquery - allows you to perform queries as a user on a particular year.");
                         break;
                     case "error":
+                        weight = new Dictionary<Tuple<uint, uint>, float>();
+
                         Console.WriteLine("\nComputing the error with regards to the test set.");
-                        
-                        // iterate through each user.
+
+                        float differenceRating = 0.0f;
+                        float numRatings = 0.0f; 
+
+                        // compute weights early to make predictions faster later.
                         foreach(KeyValuePair<uint, UserInfo> users in testingUsers.GetDataset())
                         {
-                            weight = new Dictionary<Tuple<uint, uint>, float>();
-
-                            // Computes the average rating of the active user.
+                             // Computes the average rating of the active user.
                             float averageRatingOfActive = computation.WeightedSumOfUser(trainingUsers.GetUser(users.Key));
 
                             // compute weights.
@@ -116,15 +119,70 @@ namespace ConsoleApplication
                             {
                                 float correlation = computation.Correlation(movies, trainingUsers.GetUser(users.Key), otherUsers.Value);
 
-                                if(correlation != 0.0f)
-                                     weight.Add(new Tuple<uint, uint>(users.Key, otherUsers.Key), correlation);
-                            }
- 
-                            foreach(KeyValuePair<uint, float> ratings in users.Value.GetDataset())
-                            {
-
-                            }
+                                if(!weight.ContainsKey(new Tuple<uint, uint>(otherUsers.Key, users.Key)))
+                                    // exclude any zero correlations, and some numbers are just too small.
+                                    if(correlation != 0.0f && !float.IsNaN(correlation))
+                                        weight.Add(new Tuple<uint, uint>(users.Key, otherUsers.Key), correlation);
+                            }    
                         }
+
+                        foreach(KeyValuePair<uint, UserInfo> users in testingUsers.GetDataset())
+                        {
+                            weight = new Dictionary<Tuple<uint, uint>, float>();
+
+                            // ensure the user exists in the training data as well.
+                            // otherwise we cannot predict their rating.
+                            if(trainingUsers.UserExists(users.Key))
+                            {
+                                // Computes the average rating of the active user.
+                                float averageRatingOfActive = computation.WeightedSumOfUser(trainingUsers.GetUser(users.Key));
+
+                                // compute weights.
+                                foreach(KeyValuePair<uint, UserInfo> otherUsers in trainingUsers.GetDataset())
+                                {
+                                    float correlation = computation.Correlation(movies, trainingUsers.GetUser(users.Key), otherUsers.Value);
+
+                                    // exclude any zero correlations, and some numbers are just too small.
+                                    if(correlation != 0.0f && !float.IsNaN(correlation))
+                                        weight.Add(new Tuple<uint, uint>(users.Key, otherUsers.Key), correlation);
+                                }
+    
+                                float sumWeight = computation.SumWeight(weight);
+                                foreach(KeyValuePair<uint, float> ratings in users.Value.GetDataset())
+                                {
+
+                                    float predictedRating = 0.0f;
+                                    float cumulativeSum = 0.0f;
+
+                                    foreach(KeyValuePair<Tuple<uint, uint>, float> weights in weight)
+                                        if(trainingUsers.GetUser(weights.Key.Item2).RatingExists(ratings.Key))
+                                            cumulativeSum += weights.Value *
+                                                (trainingUsers.GetRatingForUser(weights.Key.Item2, ratings.Key) - 
+                                                    computation.WeightedSumOfUser(trainingUsers.GetUser(weights.Key.Item2)));
+                                        else
+                                            cumulativeSum += weights.Value;    
+                                    // odd occurrence when there is no other weights.
+                                    if(sumWeight != 0.0f)
+                                        predictedRating = averageRatingOfActive + cumulativeSum / sumWeight;
+                                    else
+                                        predictedRating = averageRatingOfActive;
+                                    Console.WriteLine("==============================");
+                                    Console.WriteLine("UserID: " + users.Key);
+                                    Console.WriteLine("Predicted Rating of " + movies.GetMovie(ratings.Key).Title + " is " + predictedRating);
+                                    Console.WriteLine("Actual Rating of " + movies.GetMovie(ratings.Key).Title + " is " + users.Value.GetRating(ratings.Key));
+
+                                    // this simply returns the difference in ratings and adds them up.
+                                    // we will divide by the number of ratings to get the actual mean error.
+                                    differenceRating += computation.MeanAbsoluteError(predictedRating, users.Value.GetRating(ratings.Key));
+                                    numRatings++;
+                                }
+                            }
+
+                            Console.WriteLine("\n");
+                        }   
+
+                        Console.WriteLine(differenceRating / numRatings);
+
                         break;
                     case "query":
                         weight = new Dictionary<Tuple<uint, uint>, float>();
@@ -152,7 +210,6 @@ namespace ConsoleApplication
                             
                             // Computes the average rating of the active user.
                             float averageRatingOfActive = computation.WeightedSumOfUser(trainingUsers.GetUser(userID));
-                            Console.WriteLine(averageRatingOfActive);
 
                             // Compute the weights of the users and add them to the dictionary.
                             Console.WriteLine("Computing weights for users...");
@@ -184,7 +241,11 @@ namespace ConsoleApplication
                                     else
                                         cumulativeSum += weights.Value;    
                                 Console.WriteLine(cumulativeSum);   
-                                predictedRating = averageRatingOfActive + cumulativeSum / sumWeight;
+                                // odd occurrence when there is no other weights.
+                                if(sumWeight != 0.0f)
+                                    predictedRating = averageRatingOfActive + cumulativeSum / sumWeight;
+                                else
+                                    predictedRating = averageRatingOfActive;
                                 Console.WriteLine("Predicted Rating of " + movie.Value.Title + " is " + predictedRating);   
                             }
                         }
